@@ -1,0 +1,90 @@
+{
+  "name": "sqlcl-codescan",
+  "displayName": "sqlcl-codescan",
+  "publisher": "NikoSperat",
+  "description": "",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.83.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:sql",
+    "onLanguage:plsql",
+    "onLanguage:oraclesql"
+  ],
+  "repository": "https://github.com/sd1337/sqlcl-codescan-extension",
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sqlclCodescan.enable",
+        "title": "sqlcl-codescan: enable"
+      },
+      {
+        "command": "sqlclCodescan.scanWorkspace",
+        "title": "sqlcl-codescan: Scan workspace"
+      }
+    ],
+    "configuration": {
+      "title": "SQLcl Codescan",
+      "properties": {
+        "sqlclCodescan.checkOnSave": {
+          "description": "Check files on save",
+          "scope": "window",
+          "type": "boolean",
+          "default": true
+        },
+        "sqlclCodescan.checkOnOpen": {
+          "description": "Check files on opening",
+          "scope": "window",
+          "type": "boolean",
+          "default": true
+        },
+        "sqlclCodescan.sqlClPath": {
+          "description": "Path to SQLcl",
+          "scope": "window",
+          "type": "string",
+          "default": ""
+        },
+        "sqlclCodescan.ignorePaths": {
+          "description": "Ignore paths",
+          "scope": "application",
+          "type": "string",
+          "default": ""
+        },
+        "sqlclCodescan.websiteInfo": {
+          "description": "URL where details about the rules can be found",
+          "scope": "application",
+          "type": "string",
+          "default": "https://trivadis.github.io/plsql-and-sql-coding-guidelines/v4.3/4-language-usage/"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.2",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.83.0",
+    "@typescript-eslint/eslint-plugin": "^6.9.0",
+    "@typescript-eslint/parser": "^6.9.0",
+    "@vscode/test-electron": "^2.3.4",
+    "eslint": "^8.50.0",
+    "eslint-config-airbnb-typescript": "^17.1.0",
+    "fs": "^0.0.1-security",
+    "glob": "^10.3.3",
+    "mocha": "^10.2.0",
+    "path": "^0.12.7",
+    "typescript": "^5.2.2"
+  }
+}
