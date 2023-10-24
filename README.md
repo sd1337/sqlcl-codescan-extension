@@ -21,6 +21,10 @@ This extension contributes the following settings:
 * `sqlclCodescan.checkOnOpen`: Check files on open
 * `sqlclCodescan.sqlClPath`: Path to sqlcl executable
 * `sqlclCodescan.ignorePaths`: List of paths to ignore similar to .gitignore
+* `sqlclCodescan.enableFormatting`: Enable sql formatting
+* `sqlclCodescan.formattingRulePath`: Path to advanced formatting rules xml
+* `sqlclCodescan.tvdFormatterPath`: Path to format.js to load tvdformatter script
+* `sqlclCodescan.tvdArboriPath`: Path to tvd custom formatting arbori file
 * `sqlclCodescan.websiteInfo`: URL where details about the rules can be found
 
 ## Known Issues
@@ -33,6 +37,10 @@ This extension contributes the following settings:
 
 Initial release of sqlcl-codescan
 
+### 1.1.0
+
+Added severity level to diagnostics
+Added code formatting capability
 
 
 

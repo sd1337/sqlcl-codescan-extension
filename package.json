@@ -60,6 +60,30 @@
           "scope": "application",
           "type": "string",
           "default": "https://trivadis.github.io/plsql-and-sql-coding-guidelines/v4.3/4-language-usage/"
+        },
+        "sqlclCodescan.enableFormatting": {
+          "description": "Enable sql formatting",
+          "scope": "window",
+          "type": "boolean",
+          "default": true
+        },
+        "sqlclCodescan.formattingRulePath": {
+          "description": "Path to advanced formatting rules xml",
+          "scope": "window",
+          "type": "string",
+          "default": ""
+        },
+        "sqlclCodescan.tvdFormatterPath": {
+          "description": "Path to format.js to load tvdformatter script",
+          "scope": "window",
+          "type": "string",
+          "default": ""
+        },
+        "sqlclCodescan.tvdArboriPath": {
+          "description": "Path to tvd custom formatting arbori file",
+          "scope": "window",
+          "type": "string",
+          "default": ""
         }
       }
     }

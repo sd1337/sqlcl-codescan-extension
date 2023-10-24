@@ -2,12 +2,13 @@
 // Import the module and reference it with the alias vscode in your code below
 import { exec } from 'child_process';
 import * as vscode from 'vscode';
+import { parseCodeScanResultForFile } from './codescan';
+import { copySqlFiles, emptyDirectory } from './fileUtils';
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
-const crypto = require('crypto');
 
 let globalTmpDir: string;
 let proc: any;
@@ -15,41 +16,8 @@ let workspacePath = '';
 
 const config = vscode.workspace.getConfiguration();
 
-function emptyDirectory(directory: any) {
-  fs.readdirSync(directory).forEach((file: any) => {
-    const fullPath = path.join(directory, file);
-    if (fs.statSync(fullPath).isDirectory()) {
-      emptyDirectory(fullPath);
-      fs.rmdirSync(fullPath);
-    } else {
-      fs.unlinkSync(fullPath);
-    }
-  });
-}
-function copySqlFiles(source: string, target: string) {
-  // if source is a directory
-  if (fs.statSync(source).isDirectory()) {
-    // get all items in the directory
-    const items = fs.readdirSync(source);
-
-    // if the target directory does not exis
-    if (!fs.existsSync(target)) {
-      // create target directory
-      fs.mkdirSync(target, { recursive: true });
-    }
-
-    // iterate over the directory items
-    items.forEach((item: any) => {
-      // call the function for each item (could be a file or directory)
-      copySqlFiles(path.join(source, item), path.join(target, item));
-    });
-  } else if (source.endsWith('.sql')) {
-    // copy the file
-    fs.copyFileSync(source, target);
-  }
-}
-
-const collection = vscode.languages.createDiagnosticCollection('codescanWarnings');
+const outputChannel = vscode.window.createOutputChannel('sqlcl codescan');
+outputChannel.show(true);
 
 const documentCallback = (document: vscode.TextDocument) => {
   if (document.languageId !== 'plsql' && document.languageId !== 'sql' && document.languageId !== 'oraclesql') { return; } // Only process JSON files
@@ -89,139 +57,36 @@ if (config.get('sqlclCodescan.checkOnOpen')) {
 if (config.get('sqlclCodescan.checkOnSave')) {
   vscode.workspace.onDidSaveTextDocument(documentCallback);
 }
-function parseCodeScanResultForFile(
-  cwd: string,
-  fname: string,
-  file: any,
-  document: vscode.TextDocument,
-) {
-  const uri = vscode.Uri.file(path.join(cwd, fname));
-  const mapped = file.issues.map((p: any) => {
-    const { col, line } = p;
-    const foundLocal = document.getWordRangeAtPosition(new vscode.Position(line, col + 1));
-    const range = new vscode.Range(
-      new vscode.Position(line, col),
-      new vscode.Position(line, Math.max(1 + col, (foundLocal ? foundLocal.end.character : col))),
-    );
-    const diag = new vscode.Diagnostic(range, p.msg);
-    let intermediateUrl: string;
-    const partialError = p.ruleNo.substr(2, 2);
-    switch (partialError) {
-      case '10':
-        intermediateUrl = '1-general';
-        break;
-      case '21':
-        intermediateUrl = '2-variables-and-types/1-general';
-        break;
-      case '22':
-        intermediateUrl = '2-variables-and-types/2-numeric-data-types';
-        break;
-      case '23':
-        intermediateUrl = '2-variables-and-types/3-character-data-types';
-        break;
-      case '24':
-        intermediateUrl = '2-variables-and-types/4-boolean-data-types';
-        break;
-      case '25':
-        intermediateUrl = '2-variables-and-types/5-large-objects';
-        break;
-      case '26':
-        intermediateUrl = '2-variables-and-types/6-cursor-variables';
-        break;
-      case '31':
-        intermediateUrl = '3-dml-and-sql/1-general';
-        break;
-      case '32':
-        intermediateUrl = '3-dml-and-sql/2-bulk-operations';
-        break;
-      case '33':
-        intermediateUrl = '3-dml-and-sql/3-transaction-control';
-        break;
-      case '41':
-        intermediateUrl = '4-control-structures/1-cursor';
-        break;
-      case '42':
-        intermediateUrl = '4-control-structures/2-case-if-decode-nvl-nvl2-coalesce';
-        break;
-      case '43':
-        intermediateUrl = '4-control-structures/3-flow-control';
-        break;
-      case '50':
-        intermediateUrl = '5-exception-handling';
-        break;
-      case '60':
-        intermediateUrl = '6-dynamic-sql';
-        break;
-      case '71':
-        intermediateUrl = '7-stored-objects/1-general';
-        break;
-      case '72':
-        intermediateUrl = '7-stored-objects/2-packages';
-        break;
-      case '73':
-        intermediateUrl = '7-stored-objects/3-procedures';
-        break;
-      case '74':
-        intermediateUrl = '7-stored-objects/4-functions';
-        break;
-      case '75':
-        intermediateUrl = '7-stored-objects/5-oracle-supplied-packages';
-        break;
-      case '77':
-        intermediateUrl = '7-stored-objects/7-triggers';
-        break;
-      case '78':
-        intermediateUrl = '7-stored-objects/8-sequences';
-        break;
-      case '79':
-        intermediateUrl = '7-stored-objects/9-sql-macros';
-        break;
-      case '81':
-        intermediateUrl = '8-patterns/1-checking-the-number-of-rows';
-        break;
-      case '82':
-        intermediateUrl = '8-patterns/2-access-objects-of-foreign-application-schemas';
-        break;
-      case '83':
-        intermediateUrl = '8-patterns/3-validating-input-parameter-size';
-        break;
-      case '84':
-        intermediateUrl = '8-patterns/4-ensure-single-execution-at-a-time-of-a-program-unit';
-        break;
-      case '85':
-        intermediateUrl = '8-patterns/5-use-dbms-application-info-package-to-follow-progress-of-a-process';
-        break;
-      case '90':
-        intermediateUrl = '9-function-usage';
-        break;
-      default:
-        intermediateUrl = '';
-        break;
-    }
-    if (p.ruleNo === 'G-2135') {
-      diag.tags = [vscode.DiagnosticTag.Unnecessary];
-    }
-    diag.code = {
-      value: p.ruleNo,
-      target: vscode.Uri.parse(`${config.get('sqlclCodescan.websiteInfo')}${intermediateUrl}/${p.ruleNo.toLowerCase()}/`),
-    };
-    return diag;
+
+const callbacks: {
+  [Key: string]: any;
+} = {};
+
+const executeCommand = async function executeCommand(commandString: string) {
+  const rndName = Math.random().toString(36).substring(7);
+  let cmd = commandString;
+  cmd += `\nPRO ${rndName}\n`;
+  return new Promise((resolve) => {
+    callbacks[rndName] = resolve;
+    proc.stdin.write(`${cmd}\n`);
   });
-  collection.delete(uri);
-  collection.set(uri, mapped);
-}
+};
+
+let useTvdFormat = false;
+let useArbori = false;
+let arboriPath = '';
 
 const load = async function load() {
   if (vscode.workspace?.workspaceFolders?.length) {
     workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
   }
-  const hashFromWorkspacePath = crypto.createHash('sha1').update(workspacePath).digest('hex').substring(0, 8);
-  globalTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `sqlcl-codescan-tmp-${hashFromWorkspacePath}`));
+  // globalTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlcl-codescan'));
   let command = 'sql';
   const configPath = config.get('sqlclCodescan.sqlClPath');
   if (configPath) {
     command = configPath as string;
   }
+  outputChannel.appendLine(`Using sqlcl command: ${command}`);
   const foundRightVersion = await new Promise((resolve) => {
     exec(`${command} -V`, (error, stdout) => {
       if (error) {
@@ -230,9 +95,11 @@ const load = async function load() {
         return;
       }
       const match = stdout.match(/Build:\s+(\d+)\.(\d+)\.(\d+)\.(\d+)\.(\d+)/);
-      const [, major] = match || [];
-      if (parseInt(major, 10) < 23) {
-        vscode.window.showErrorMessage('SQLcl Codescan: SQLcl version must be version 23 or higher');
+      const [, major, minor, patch, build, revision] = match || [];
+
+      outputChannel.appendLine(`SQLcl version: ${major}.${minor}.${patch}.${build}.${revision}`);
+      if (parseInt(major, 10) + (parseInt(minor, 10) / 10) < 23.3) {
+        vscode.window.showErrorMessage('SQLcl Codescan: SQLcl version must be version 23.3 or higher');
         resolve(false);
         return;
       }
@@ -242,11 +109,45 @@ const load = async function load() {
   if (!foundRightVersion) {
     return;
   }
+  const formattingEnabled = config.get('sqlclCodescan.enableFormatting');
 
   proc = spawn(`${command} /nolog`, { cwd: globalTmpDir, shell: true });
-  vscode.workspace.openTextDocument();
+
+  let ready = false;
+  const onReady = () => {
+    if (formattingEnabled) {
+      outputChannel.appendLine('Formatting enabled');
+      const formatRulePath = config.get('sqlclCodescan.formattingRulePath');
+      if (formatRulePath) {
+        const formatPath = path.join(workspacePath, 'trivadis_advanced_format.xml');
+        executeCommand(`format RULES ${formatPath};`);
+        outputChannel.appendLine(`Using formatting rules from ${formatRulePath}`);
+      }
+      const tvdFormatterPath = config.get('sqlclCodescan.tvdFormatterPath');
+      if (tvdFormatterPath) {
+        outputChannel.appendLine(`Using tvd formatter from ${tvdFormatterPath}`);
+        useTvdFormat = true;
+        const customRules = path.join(workspacePath, tvdFormatterPath);
+        executeCommand(`script ${customRules} --register`);
+        const arboriPathLocal = config.get('sqlclCodescan.tvdArboriPath');
+        if (arboriPathLocal) {
+          outputChannel.appendLine(`Using arbori advanced formatting script from ${arboriPathLocal}`);
+          useArbori = true;
+          arboriPath = path.join(workspacePath, arboriPathLocal);
+        }
+      }
+    }
+  };
   proc.stdout.on('data', (data: any) => {
     console.log(`stdout: ${data}`);
+    const str = data.toString();
+    if (!ready && (str.indexOf('SQL>') > -1)) {
+      ready = true;
+      onReady();
+    }
+    if (!ready) {
+      return;
+    }
     if (fs.existsSync(path.join(globalTmpDir, 'tmp.json'))) {
       const warnings = JSON.parse(fs.readFileSync(path.resolve(path.join(globalTmpDir, 'tmp.json')), 'utf8'));
       warnings.forEach((p: any) => {
@@ -259,10 +160,88 @@ const load = async function load() {
       });
       emptyDirectory(globalTmpDir);
     }
+    const dataStr: string = data.toString().replace(/\n$/, '');
+    const cb = callbacks[dataStr];
+    if (cb) {
+      cb();
+      delete callbacks[dataStr];
+    }
   });
   proc.stderr.on('data', (data: any) => {
     console.log(`stderr: ${data}`);
+    const str = data.toString();
+    if (!ready && (str.indexOf('SQL>') > -1)) {
+      ready = true;
+      onReady();
+    }
   });
+
+  if (formattingEnabled) {
+    vscode.languages.registerDocumentFormattingEditProvider(['plsql', 'sql', 'oraclesql'], {
+      async provideDocumentFormattingEdits(
+        document: vscode.TextDocument,
+      ): Promise<vscode.TextEdit[]> {
+        const { fsPath } = document.uri;
+        // const fullSourcePath = path.join(workspacePath, fsPath);
+        const rndName = Math.random().toString(36).substring(7);
+        const outPath = path.join(globalTmpDir, `${rndName}.sql`);
+        if (!useTvdFormat) {
+          await executeCommand(`format file ${fsPath} ${outPath};`);
+        } else {
+          const inPath = path.join(globalTmpDir, `in_${rndName}.sql`);
+          fs.copyFileSync(fsPath, inPath);
+          if (!useArbori) {
+            await executeCommand(`tvdformat ${inPath}`);
+          } else {
+            await executeCommand(`tvdformat ${inPath} arbori=${arboriPath}`);
+          }
+          fs.copyFileSync(inPath, outPath);
+          fs.unlinkSync(inPath);
+        }
+        const formatted = fs.readFileSync(outPath, 'utf8');
+        fs.unlinkSync(outPath);
+        // debugger;
+        return [{
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(document.lineCount + 1, 0),
+          ),
+          newText: formatted,
+        }];
+      },
+    });
+    vscode.languages.registerDocumentRangeFormattingEditProvider(['plsql', 'sql', 'oraclesql'], {
+      async provideDocumentRangeFormattingEdits(
+        document: vscode.TextDocument,
+        range: vscode.Range,
+      ): Promise<vscode.TextEdit[]> {
+        const tmpText = document.getText(range);
+        // const fullSourcePath = path.join(workspacePath, fsPath);
+        const rndName = Math.random().toString(36).substring(7);
+        const inPath = path.join(globalTmpDir, `in_${rndName}.sql`);
+        const outPath = path.join(globalTmpDir, `${rndName}.sql`);
+        fs.writeFileSync(inPath, tmpText);
+        if (!useTvdFormat) {
+          await executeCommand(`format file ${inPath} ${outPath};`);
+        } else {
+          if (!useArbori) {
+            await executeCommand(`tvdformat ${inPath}`);
+          } else {
+            await executeCommand(`tvdformat ${inPath} arbori=${arboriPath}`);
+          }
+          fs.copyFileSync(inPath, outPath);
+          fs.unlinkSync(inPath);
+        }
+        const formatted = fs.readFileSync(outPath, 'utf8');
+        fs.unlinkSync(inPath);
+        fs.unlinkSync(outPath);
+        return [{
+          range,
+          newText: formatted,
+        }];
+      },
+    });
+  }
 };
 
 const unload = function unload() {
@@ -278,6 +257,15 @@ const unload = function unload() {
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
   console.log('Congratulations, your extension "sqlcl-codescan" is now active!');
+  if (context.storageUri) {
+    if (!fs.existsSync(context.storageUri.fsPath)) {
+      // create target directory
+      fs.mkdirSync(context.storageUri.fsPath, { recursive: true });
+    }
+    globalTmpDir = context.storageUri.fsPath;
+  } else {
+    globalTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlcl-codescan'));
+  }
   load();
   const disposable = vscode.commands.registerCommand('sqlclCodescan.enable', () => {
     load();
