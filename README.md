@@ -42,5 +42,7 @@ Initial release of sqlcl-codescan
 Added severity level to diagnostics
 Added code formatting capability
 
+### 1.1.1
 
-
+Added support for UTF-8 BOM encoded files
+Showing results in vscode output channel

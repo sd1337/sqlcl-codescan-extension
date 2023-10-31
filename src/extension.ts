@@ -1,5 +1,3 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import { exec } from 'child_process';
 import * as vscode from 'vscode';
 import { parseCodeScanResultForFile } from './codescan';
@@ -19,22 +17,30 @@ const config = vscode.workspace.getConfiguration();
 const outputChannel = vscode.window.createOutputChannel('sqlcl codescan');
 outputChannel.show(true);
 
-const documentCallback = (document: vscode.TextDocument) => {
-  if (document.languageId !== 'plsql' && document.languageId !== 'sql' && document.languageId !== 'oraclesql') { return; } // Only process JSON files
+const documentCallback = async (document: vscode.TextDocument) => {
+  if (document.languageId !== 'plsql' && document.languageId !== 'sql' && document.languageId !== 'oraclesql') { return; }
   const originalPath = document.uri.fsPath;
 
   let relativePath = document.uri.fsPath;
   relativePath = document.uri.fsPath.replace(workspacePath, '');
   relativePath = relativePath.substring(1);
   const targetDir = path.dirname(path.join(globalTmpDir, relativePath));
-  if (!fs.existsSync(targetDir)) { // if target directory does not exist
-    fs.mkdirSync(targetDir, { recursive: true }); // create it
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
   }
 
   const copyPath = path.join(targetDir, path.basename(originalPath));
 
   fs.copyFileSync(originalPath, copyPath);
-
+  const fd = fs.openSync(copyPath, 'r');
+  const buffer = Buffer.alloc(3);
+  await fs.read(fd, buffer, 0, 3, 0, () => {});
+  const hasBom = buffer.toString().charCodeAt(0) === 0xFEFF;
+  fs.close(fd, () => {});
+  if (hasBom) {
+    const newContent = fs.readFileSync(copyPath, 'utf8');
+    fs.writeFileSync(copyPath, newContent.substring(1));
+  }
   if (proc) {
     const options = ['-path .', '-format json', '-output tmp.json'];
     // const settingsPath = config.get('sqlclCodescan.settingsPath');
@@ -80,7 +86,6 @@ const load = async function load() {
   if (vscode.workspace?.workspaceFolders?.length) {
     workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
   }
-  // globalTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlcl-codescan'));
   let command = 'sql';
   const configPath = config.get('sqlclCodescan.sqlClPath');
   if (configPath) {
@@ -139,7 +144,6 @@ const load = async function load() {
     }
   };
   proc.stdout.on('data', (data: any) => {
-    console.log(`stdout: ${data}`);
     const str = data.toString();
     if (!ready && (str.indexOf('SQL>') > -1)) {
       ready = true;
@@ -149,11 +153,11 @@ const load = async function load() {
       return;
     }
     if (fs.existsSync(path.join(globalTmpDir, 'tmp.json'))) {
+      outputChannel.appendLine(str);
       const warnings = JSON.parse(fs.readFileSync(path.resolve(path.join(globalTmpDir, 'tmp.json')), 'utf8'));
       warnings.forEach((p: any) => {
         const fname = p.file.replace(/^.\//, '');
         const uri = vscode.Uri.file(path.join(workspacePath, fname));
-        console.log(`adding warning to ${fname}`);
         vscode.workspace.openTextDocument(uri).then((doc) => {
           parseCodeScanResultForFile(workspacePath, fname, p, doc);
         });
@@ -168,7 +172,6 @@ const load = async function load() {
     }
   });
   proc.stderr.on('data', (data: any) => {
-    console.log(`stderr: ${data}`);
     const str = data.toString();
     if (!ready && (str.indexOf('SQL>') > -1)) {
       ready = true;
@@ -182,7 +185,6 @@ const load = async function load() {
         document: vscode.TextDocument,
       ): Promise<vscode.TextEdit[]> {
         const { fsPath } = document.uri;
-        // const fullSourcePath = path.join(workspacePath, fsPath);
         const rndName = Math.random().toString(36).substring(7);
         const outPath = path.join(globalTmpDir, `${rndName}.sql`);
         if (!useTvdFormat) {
@@ -253,10 +255,7 @@ const unload = function unload() {
   }
 };
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Congratulations, your extension "sqlcl-codescan" is now active!');
   if (context.storageUri) {
     if (!fs.existsSync(context.storageUri.fsPath)) {
       // create target directory
@@ -296,7 +295,6 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(unloadCommand);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {
   unload();
 }

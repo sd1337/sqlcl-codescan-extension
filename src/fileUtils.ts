@@ -13,7 +13,7 @@ export function emptyDirectory(directory: any) {
   });
 }
 
-export function copySqlFiles(source: string, target: string) {
+export async function copySqlFiles(source: string, target: string) {
   // if source is a directory
   if (fs.statSync(source).isDirectory()) {
     // get all items in the directory
@@ -33,5 +33,14 @@ export function copySqlFiles(source: string, target: string) {
   } else if (source.endsWith('.sql')) {
     // copy the file
     fs.copyFileSync(source, target);
+    const fd = fs.openSync(target, 'r');
+    const buffer = Buffer.alloc(3);
+    await fs.read(fd, buffer, 0, 3, 0, () => {});
+    const hasBom = buffer.toString().charCodeAt(0) === 0xFEFF;
+    fs.close(fd, () => {});
+    if (hasBom) {
+      const newContent = fs.readFileSync(target, 'utf8');
+      fs.writeFileSync(target, newContent.substring(1));
+    }
   }
 }
