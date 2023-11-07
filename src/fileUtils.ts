@@ -1,8 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-export function emptyDirectory(directory: any) {
+export function emptyDirectory(directory: string, ignore: string = '') {
   fs.readdirSync(directory).forEach((file: any) => {
+    if (ignore && file === ignore) {
+      return;
+    }
     const fullPath = path.join(directory, file);
     if (fs.statSync(fullPath).isDirectory()) {
       emptyDirectory(fullPath);

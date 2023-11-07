@@ -46,3 +46,9 @@ Added code formatting capability
 
 Added support for UTF-8 BOM encoded files
 Showing results in vscode output channel
+
+### 1.1.2
+
+Refactored stdin/out handling for sqlcl
+Improved output channel info
+Improved error handling for failing scans
