@@ -6,6 +6,10 @@ const config = vscode.workspace.getConfiguration();
 
 const collection = vscode.languages.createDiagnosticCollection('codescanWarnings');
 
+export function getCollection() {
+  return collection;
+}
+
 export function getSeverity(ruleNo: string): vscode.DiagnosticSeverity {
   let severity = vscode.DiagnosticSeverity.Warning;
   const minor = vscode.DiagnosticSeverity.Information;

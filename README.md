@@ -52,3 +52,7 @@ Showing results in vscode output channel
 Refactored stdin/out handling for sqlcl
 Improved output channel info
 Improved error handling for failing scans
+
+### 1.1.3
+
+Fixed handling when no error occured

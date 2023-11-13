@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import * as vscode from 'vscode';
-import { parseCodeScanResultForFile } from './codescan';
+import { getCollection, parseCodeScanResultForFile } from './codescan';
 import { copySqlFiles, emptyDirectory } from './fileUtils';
 
 const fs = require('fs');
@@ -85,20 +85,25 @@ const documentCallback = async (document: vscode.TextDocument) => {
     const output = await executeCommand(`codescan ${joined}`) as string;
     outputChannel.append(output);
     if (fs.existsSync(path.join(globalTmpDir, scanResultName))) {
-      // outputChannel.appendLine(str);
-      try {
-        const warnings = JSON.parse(fs.readFileSync(path.resolve(path.join(globalTmpDir, scanResultName)), 'utf8'));
-        warnings.forEach((p: any) => {
-          const fname = p.file.replace(/^.\//, '');
-          const uri = vscode.Uri.file(path.join(workspacePath, fname));
-          vscode.workspace.openTextDocument(uri).then((doc) => {
-            parseCodeScanResultForFile(workspacePath, fname, p, doc);
+      if (output.indexOf('0 total distinct warnings') === -1) {
+        try {
+          const content = fs.readFileSync(path.resolve(path.join(globalTmpDir, scanResultName)), 'utf8');
+          const warnings = JSON.parse(content);
+          warnings.forEach((p: any) => {
+            const fname = p.file.replace(/^.\//, '');
+            const uri = vscode.Uri.file(path.join(workspacePath, fname));
+            vscode.workspace.openTextDocument(uri).then((doc) => {
+              parseCodeScanResultForFile(workspacePath, fname, p, doc);
+            });
           });
-        });
-      } catch (e) {
-        outputChannel.appendLine(`An error occured while parsing ${scanResultName}`);
-      } finally {
-        emptyDirectory(globalTmpDir, 'tvd_tmp');
+        } catch (e) {
+          outputChannel.appendLine(`An error occured while parsing ${scanResultName}`);
+        } finally {
+          emptyDirectory(globalTmpDir, 'tvd_tmp');
+        }
+      } else {
+        const collection = getCollection();
+        collection.delete(document.uri);
       }
     }
   }
