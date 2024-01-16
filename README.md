@@ -56,3 +56,8 @@ Improved error handling for failing scans
 ### 1.1.3
 
 Fixed handling when no error occured
+
+### 1.1.4
+
+Fixed an issue caused by absolute paths for formatting rules or arbori file
+Fixed issues caused by whitespace in paths for formatting rules or arbori file

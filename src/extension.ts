@@ -28,9 +28,9 @@ const copyFileSync = async (source: string, destination: string) => {
   fs.copyFileSync(source, destination);
   const fd = fs.openSync(destination, 'r');
   const buffer = Buffer.alloc(3);
-  await fs.read(fd, buffer, 0, 3, 0, () => {});
+  await fs.read(fd, buffer, 0, 3, 0, () => { });
   const hasBom = buffer.toString().charCodeAt(0) === 0xFEFF;
-  fs.close(fd, () => {});
+  fs.close(fd, () => { });
   if (hasBom) {
     const newContent = fs.readFileSync(destination, 'utf8');
     fs.writeFileSync(destination, newContent.substring(1));
@@ -170,13 +170,22 @@ const load = async function load() {
       if (tvdFormatterPath) {
         outputChannel.appendLine(`Using tvd formatter from ${tvdFormatterPath}`);
         useTvdFormat = true;
-        const customRules = path.join(workspacePath, tvdFormatterPath);
-        executeCommand(`script ${customRules} --register`);
+        let customRules = null;
+        if (!path.isAbsolute(tvdFormatterPath)) {
+          customRules = path.join(workspacePath, tvdFormatterPath);
+        } else {
+          customRules = tvdFormatterPath;
+        }
+        executeCommand(`script "${customRules}" --register`);
         const arboriPathLocal = config.get('sqlclCodescan.tvdArboriPath');
         if (arboriPathLocal) {
           outputChannel.appendLine(`Using arbori advanced formatting script from ${arboriPathLocal}`);
           useArbori = true;
-          arboriPath = path.join(workspacePath, arboriPathLocal);
+          if (!path.isAbsolute(arboriPathLocal)) {
+            arboriPath = path.join(workspacePath, arboriPathLocal);
+          } else {
+            arboriPath = arboriPathLocal as string;
+          }
         }
       }
     }
@@ -254,7 +263,7 @@ const load = async function load() {
             if (!useArbori) {
               await executeCommand(`tvdformat ${inPath}`);
             } else {
-              await executeCommand(`tvdformat ${inPath} arbori=${arboriPath}`);
+              await executeCommand(`tvdformat ${inPath} "arbori=${arboriPath}"`);
             }
             fs.copyFileSync(inPath, outPath);
             fs.unlinkSync(inPath);
