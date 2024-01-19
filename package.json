@@ -3,7 +3,7 @@
   "displayName": "sqlcl-codescan",
   "publisher": "NikoSperat",
   "description": "",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "engines": {
     "vscode": "^1.83.0"
   },
@@ -13,7 +13,8 @@
   "activationEvents": [
     "onLanguage:sql",
     "onLanguage:plsql",
-    "onLanguage:oraclesql"
+    "onLanguage:oraclesql",
+    "onLanguage:oracle_sql"
   ],
   "repository": "https://github.com/sd1337/sqlcl-codescan-extension",
   "main": "./out/extension.js",
@@ -42,6 +43,12 @@
           "scope": "window",
           "type": "boolean",
           "default": true
+        },
+        "sqlclCodescan.checkOnType": {
+          "description": "Check files while interactve typing",
+          "scope": "window",
+          "type": "boolean",
+          "default": false
         },
         "sqlclCodescan.sqlClPath": {
           "description": "Path to SQLcl",
@@ -80,7 +87,7 @@
           "default": ""
         },
         "sqlclCodescan.tvdArboriPath": {
-          "description": "Path to tvd custom formatting arbori file",
+          "description": "Path to tvd custom formatting arbori file (note that Tvd Formatter Path is required for this option)",
           "scope": "window",
           "type": "string",
           "default": ""

@@ -6,7 +6,7 @@ const config = vscode.workspace.getConfiguration();
 
 const collection = vscode.languages.createDiagnosticCollection('codescanWarnings');
 
-export function getCollection() {
+export function getCollection(): vscode.DiagnosticCollection {
   return collection;
 }
 

@@ -61,3 +61,11 @@ Fixed handling when no error occured
 
 Fixed an issue caused by absolute paths for formatting rules or arbori file
 Fixed issues caused by whitespace in paths for formatting rules or arbori file
+
+### 1.1.5
+
+Added SQL Developer Extension file support
+Improved warning messages for configurations
+Added support to format selected text
+Experimental parsing error output for formatting
+Added option to interactivly run codescan while typing

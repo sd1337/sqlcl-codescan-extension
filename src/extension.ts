@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import * as vscode from 'vscode';
 import { getCollection, parseCodeScanResultForFile } from './codescan';
 import { copySqlFiles, emptyDirectory } from './fileUtils';
+import { onReady as formattingOnReady } from './formatting';
 
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +14,7 @@ let proc: any;
 let workspacePath = '';
 const scanResultName = 'tmp.json';
 
-const config = vscode.workspace.getConfiguration();
+let config = vscode.workspace.getConfiguration();
 
 const outputChannel = vscode.window.createOutputChannel('sqlcl codescan');
 outputChannel.show(true);
@@ -41,10 +42,10 @@ const callbacks: {
   [Key: string]: any;
 } = {};
 
-const executeCommand = async function executeCommand(commandString: string) {
+const executeCommand = async function executeCommand(commandString: string): Promise<string> {
   const rndName = Math.random().toString(36).substring(7);
   let cmd = commandString;
-  cmd += `\nPRO ${rndName}\n`;
+  cmd += `\nPRO $$${rndName}\n`;
   return new Promise((resolve) => {
     callbacks[rndName] = resolve;
     writeInput(`${cmd}\n`);
@@ -52,7 +53,7 @@ const executeCommand = async function executeCommand(commandString: string) {
 };
 
 const documentCallback = async (document: vscode.TextDocument) => {
-  if (document.languageId !== 'plsql' && document.languageId !== 'sql' && document.languageId !== 'oraclesql') { return; }
+  if (document.languageId !== 'plsql' && document.languageId !== 'sql' && document.languageId !== 'oraclesql' && document.languageId !== 'oracle_sql') { return; }
   const originalPath = document.uri.fsPath;
 
   let relativePath = document.uri.fsPath;
@@ -65,7 +66,9 @@ const documentCallback = async (document: vscode.TextDocument) => {
 
   const copyPath = path.join(targetDir, path.basename(originalPath));
 
-  copyFileSync(originalPath, copyPath);
+  const text = document.getText();
+  fs.writeFileSync(copyPath, text);
+  // copyFileSync(originalPath, copyPath);
   if (proc) {
     const options = ['-path .', '-format json', `-output ${scanResultName}`];
     // const settingsPath = config.get('sqlclCodescan.settingsPath');
@@ -116,11 +119,25 @@ if (config.get('sqlclCodescan.checkOnSave')) {
   vscode.workspace.onDidSaveTextDocument(documentCallback);
 }
 
-let useTvdFormat = false;
-let useArbori = false;
-let arboriPath = '';
+if (config.get('sqlclCodescan.checkOnType')) {
+  let timeoutId: NodeJS.Timeout;
+  vscode.workspace.onDidChangeTextDocument((event) => {
+    // debounce here using setTimeout
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => documentCallback(event.document), 100);
+  });
+}
 
-const load = async function load() {
+export function showWarning(message: string) {
+  outputChannel.appendLine(`WARNING: ${message}`);
+  vscode.window.showWarningMessage(message, 'Open Output Channel').then((selectedAction) => {
+    if (selectedAction && selectedAction === 'Open Output Channel') {
+      outputChannel.show();
+    }
+  });
+}
+
+const load = async function load(context: vscode.ExtensionContext) {
   if (vscode.workspace?.workspaceFolders?.length) {
     workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
   }
@@ -159,35 +176,15 @@ const load = async function load() {
   let ready = false;
   const onReady = () => {
     if (formattingEnabled) {
-      outputChannel.appendLine('Formatting enabled');
-      const formatRulePath = config.get('sqlclCodescan.formattingRulePath');
-      if (formatRulePath) {
-        const formatPath = path.join(workspacePath, 'trivadis_advanced_format.xml');
-        executeCommand(`format RULES ${formatPath};`);
-        outputChannel.appendLine(`Using formatting rules from ${formatRulePath}`);
-      }
-      const tvdFormatterPath = config.get('sqlclCodescan.tvdFormatterPath');
-      if (tvdFormatterPath) {
-        outputChannel.appendLine(`Using tvd formatter from ${tvdFormatterPath}`);
-        useTvdFormat = true;
-        let customRules = null;
-        if (!path.isAbsolute(tvdFormatterPath)) {
-          customRules = path.join(workspacePath, tvdFormatterPath);
-        } else {
-          customRules = tvdFormatterPath;
-        }
-        executeCommand(`script "${customRules}" --register`);
-        const arboriPathLocal = config.get('sqlclCodescan.tvdArboriPath');
-        if (arboriPathLocal) {
-          outputChannel.appendLine(`Using arbori advanced formatting script from ${arboriPathLocal}`);
-          useArbori = true;
-          if (!path.isAbsolute(arboriPathLocal)) {
-            arboriPath = path.join(workspacePath, arboriPathLocal);
-          } else {
-            arboriPath = arboriPathLocal as string;
-          }
-        }
-      }
+      formattingOnReady(
+        outputChannel,
+        config,
+        workspacePath,
+        globalTmpDir,
+        executeCommand,
+        showWarning,
+        context,
+      );
     }
   };
   let buffer = '';
@@ -200,26 +197,8 @@ const load = async function load() {
     if (!ready) {
       return;
     }
-    // if (fs.existsSync(path.join(globalTmpDir, scanResultName))) {
-    //   outputChannel.appendLine(str);
-    //   try {
-    //     const warnings = JSON.parse(
-    // fs.readFileSync(path.resolve(path.join(globalTmpDir, scanResultName)), 'utf8'));
-    //     warnings.forEach((p: any) => {
-    //       const fname = p.file.replace(/^.\//, '');
-    //       const uri = vscode.Uri.file(path.join(workspacePath, fname));
-    //       vscode.workspace.openTextDocument(uri).then((doc) => {
-    //         parseCodeScanResultForFile(workspacePath, fname, p, doc);
-    //       });
-    //     });
-    //   } catch (e) {
-    //     outputChannel.appendLine(`An error occured while parsing ${scanResultName}`);
-    //   } finally {
-    //     emptyDirectory(globalTmpDir, 'tvd_tmp');
-    //   }
-    // }
     buffer += data.toString();
-    const matched = buffer.toString().match(/(.+)\n(.+)\n$/m);
+    const matched = buffer.toString().match(/(.+)\n\$\$(.+)\n$/m);
     if (matched) {
       const [, , dataStr] = matched;
       const cb = callbacks[dataStr];
@@ -237,88 +216,10 @@ const load = async function load() {
       onReady();
     }
   });
-
-  if (formattingEnabled) {
-    vscode.languages.registerDocumentFormattingEditProvider(['plsql', 'sql', 'oraclesql'], {
-      async provideDocumentFormattingEdits(
-        document: vscode.TextDocument,
-      ): Promise<vscode.TextEdit[]> {
-        const { fsPath } = document.uri;
-        try {
-          const rndName = Math.random().toString(36).substring(7);
-          const tmpPath = path.join(globalTmpDir, 'tvd_tmp');
-          if (!fs.existsSync(tmpPath)) {
-            // create target directory
-            fs.mkdirSync(tmpPath, { recursive: true });
-          }
-          const outPath = path.join(tmpPath, `${rndName}.sql`);
-          const relativePath = fsPath.replace(workspacePath, '').substring(1);
-          if (!useTvdFormat) {
-            outputChannel.appendLine(`Formatting file ${relativePath} using default formatter`);
-            await executeCommand(`format file ${fsPath} ${outPath};`);
-          } else {
-            outputChannel.appendLine(`Formatting file ${relativePath} using tvd formatter`);
-            const inPath = path.join(tmpPath, `in_${rndName}.sql`);
-            copyFileSync(fsPath, inPath);
-            if (!useArbori) {
-              await executeCommand(`tvdformat ${inPath}`);
-            } else {
-              await executeCommand(`tvdformat ${inPath} "arbori=${arboriPath}"`);
-            }
-            fs.copyFileSync(inPath, outPath);
-            fs.unlinkSync(inPath);
-          }
-          const formatted = fs.readFileSync(outPath, 'utf8');
-          outputChannel.appendLine(`Formatted file ${relativePath}`);
-          fs.unlinkSync(outPath);
-          // debugger;
-          return [{
-            range: new vscode.Range(
-              new vscode.Position(0, 0),
-              new vscode.Position(document.lineCount + 1, 0),
-            ),
-            newText: formatted,
-          }];
-        } catch (e) {
-          outputChannel.appendLine(`An error occured while formatting ${fsPath}`);
-          throw e;
-        }
-      },
-    });
-    vscode.languages.registerDocumentRangeFormattingEditProvider(['plsql', 'sql', 'oraclesql'], {
-      async provideDocumentRangeFormattingEdits(
-        document: vscode.TextDocument,
-        range: vscode.Range,
-      ): Promise<vscode.TextEdit[]> {
-        const tmpText = document.getText(range);
-        const rndName = Math.random().toString(36).substring(7);
-        const inPath = path.join(globalTmpDir, `in_${rndName}.sql`);
-        const outPath = path.join(globalTmpDir, `${rndName}.sql`);
-        fs.writeFileSync(inPath, tmpText);
-        if (!useTvdFormat) {
-          await executeCommand(`format file ${inPath} ${outPath};`);
-        } else {
-          if (!useArbori) {
-            await executeCommand(`tvdformat ${inPath}`);
-          } else {
-            await executeCommand(`tvdformat ${inPath} arbori=${arboriPath}`);
-          }
-          fs.copyFileSync(inPath, outPath);
-          fs.unlinkSync(inPath);
-        }
-        const formatted = fs.readFileSync(outPath, 'utf8');
-        fs.unlinkSync(inPath);
-        fs.unlinkSync(outPath);
-        return [{
-          range,
-          newText: formatted,
-        }];
-      },
-    });
-  }
 };
 
 const unload = function unload() {
+  outputChannel.appendLine('Unloading Sqlcl Codescan');
   if (proc) {
     proc.stdin.end();
   }
@@ -338,9 +239,9 @@ export function activate(context: vscode.ExtensionContext) {
     globalTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlcl-codescan'));
   }
   emptyDirectory(globalTmpDir);
-  load();
+  load(context);
   const disposable = vscode.commands.registerCommand('sqlclCodescan.enable', () => {
-    load();
+    load(context);
   });
   const unloadCommand = vscode.commands.registerCommand('sqlclCodescan.disable', () => {
     unload();
@@ -366,6 +267,31 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable);
   context.subscriptions.push(scanWorkspace);
   context.subscriptions.push(unloadCommand);
+
+  vscode.workspace.onDidChangeConfiguration(async (event) => {
+    config = vscode.workspace.getConfiguration();
+    if (event.affectsConfiguration('sqlclCodescan')) {
+      context.subscriptions.forEach((d) => {
+        if (d !== disposable && d !== scanWorkspace && d !== unloadCommand) {
+          d.dispose();
+        }
+        // debugger;
+      });
+      outputChannel.appendLine('Configuration changed');
+      const formattingEnabled = config.get('sqlclCodescan.enableFormatting');
+      if (formattingEnabled) {
+        formattingOnReady(
+          outputChannel,
+          config,
+          workspacePath,
+          globalTmpDir,
+          executeCommand,
+          showWarning,
+          context,
+        );
+      }
+    }
+  });
 }
 
 export function deactivate() {
