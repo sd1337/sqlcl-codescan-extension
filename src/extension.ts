@@ -25,19 +25,6 @@ const writeInput = (str: string) => {
   }
 };
 
-const copyFileSync = async (source: string, destination: string) => {
-  fs.copyFileSync(source, destination);
-  const fd = fs.openSync(destination, 'r');
-  const buffer = Buffer.alloc(3);
-  await fs.read(fd, buffer, 0, 3, 0, () => { });
-  const hasBom = buffer.toString().charCodeAt(0) === 0xFEFF;
-  fs.close(fd, () => { });
-  if (hasBom) {
-    const newContent = fs.readFileSync(destination, 'utf8');
-    fs.writeFileSync(destination, newContent.substring(1));
-  }
-};
-
 const callbacks: {
   [Key: string]: any;
 } = {};
@@ -68,7 +55,6 @@ const documentCallback = async (document: vscode.TextDocument) => {
 
   const text = document.getText();
   fs.writeFileSync(copyPath, text);
-  // copyFileSync(originalPath, copyPath);
   if (proc) {
     const options = ['-path .', '-format json', `-output ${scanResultName}`];
     // const settingsPath = config.get('sqlclCodescan.settingsPath');
@@ -123,8 +109,11 @@ if (config.get('sqlclCodescan.checkOnType')) {
   let timeoutId: NodeJS.Timeout;
   vscode.workspace.onDidChangeTextDocument((event) => {
     // debounce here using setTimeout
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => documentCallback(event.document), 100);
+    if (event.contentChanges.length > 0
+      && event.contentChanges.filter((p) => p.text.trim()).length > 0) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => documentCallback(event.document), 500);
+    }
   });
 }
 

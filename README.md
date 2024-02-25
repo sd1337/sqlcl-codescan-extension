@@ -35,37 +35,41 @@ This extension contributes the following settings:
 
 ### 1.0.0
 
-Initial release of sqlcl-codescan
+* Initial release of sqlcl-codescan
 
 ### 1.1.0
 
-Added severity level to diagnostics
-Added code formatting capability
+* dded severity level to diagnostics
+* Added code formatting capability
 
 ### 1.1.1
 
-Added support for UTF-8 BOM encoded files
-Showing results in vscode output channel
+* Added support for UTF-8 BOM encoded files
+* Showing results in vscode output channel
 
 ### 1.1.2
 
-Refactored stdin/out handling for sqlcl
-Improved output channel info
-Improved error handling for failing scans
+* Refactored stdin/out handling for sqlcl
+* Improved output channel info
+* Improved error handling for failing scans
 
 ### 1.1.3
 
-Fixed handling when no error occured
+* Fixed handling when no error occured
 
 ### 1.1.4
 
-Fixed an issue caused by absolute paths for formatting rules or arbori file
-Fixed issues caused by whitespace in paths for formatting rules or arbori file
+* Fixed an issue caused by absolute paths for formatting rules or arbori file
+* Fixed issues caused by whitespace in paths for formatting rules or arbori file
 
 ### 1.1.5
 
-Added SQL Developer Extension file support
-Improved warning messages for configurations
-Added support to format selected text
-Experimental parsing error output for formatting
-Added option to interactivly run codescan while typing
+* Added SQL Developer Extension file support
+* Improved warning messages for configurations
+* Added support to format selected text
+* Experimental parsing error output for formatting
+* Added option to interactivly run codescan while typing
+
+### 1.1.6
+* Improvements on auto scan on type
+* Added support for format on save
