@@ -186,7 +186,7 @@ const load = async function load(context: vscode.ExtensionContext) {
     if (!ready) {
       return;
     }
-    buffer += data.toString();
+    buffer += data.toString().replaceAll('SQL> ', '');
     const matched = buffer.toString().match(/(.+)\n\$\$(.+)\n$/m);
     if (matched) {
       const [, , dataStr] = matched;
