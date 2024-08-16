@@ -46,9 +46,16 @@ const documentCallback = async (document: vscode.TextDocument) => {
   const originalPath = document.uri.fsPath;
 
   let relativePath = document.uri.fsPath;
-  relativePath = document.uri.fsPath.replace(workspacePath, '');
-  relativePath = relativePath.substring(1);
-  const targetDir = path.dirname(path.join(globalTmpDir, relativePath));
+  let targetDir;
+  let outOfWorkspaceFile = false;
+  if (relativePath.includes(workspacePath)) {
+    relativePath = document.uri.fsPath.replace(workspacePath, '');
+    relativePath = relativePath.substring(1);
+    targetDir = path.dirname(path.join(globalTmpDir, relativePath));
+  } else {
+    outOfWorkspaceFile = true;
+    targetDir = globalTmpDir;
+  }
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
@@ -82,9 +89,15 @@ const documentCallback = async (document: vscode.TextDocument) => {
           const warnings = JSON.parse(content);
           warnings.forEach((p: any) => {
             const fname = p.file.replace(/^.\//, '');
-            const uri = vscode.Uri.file(path.join(workspacePath, fname));
+            let uri;
+            if (!outOfWorkspaceFile) {
+              uri = vscode.Uri.file(path.join(workspacePath, fname));
+            } else {
+              uri = vscode.Uri.file(relativePath);
+            }
+            const cwdPath = !outOfWorkspaceFile ? workspacePath : path.dirname(originalPath);
             vscode.workspace.openTextDocument(uri).then((doc) => {
-              parseCodeScanResultForFile(workspacePath, fname, p, doc);
+              parseCodeScanResultForFile(cwdPath, fname, p, doc);
             });
           });
         } catch (e) {
