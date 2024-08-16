@@ -118,6 +118,9 @@ const onReady = async function onReady(
   pOutputChannel.appendLine('Formatting enabled');
   let formatRulePath = config.get('sqlclCodescan.formattingRulePath');
   if (formatRulePath) {
+    if (!path.isAbsolute(formatRulePath)) {
+      formatRulePath = path.join(pWorkspacePath, formatRulePath);
+    }
     const stat = fs.statSync(formatRulePath);
     if (stat.isDirectory()) {
       formatRulePath = path.join(formatRulePath, 'trivadis_advanced_format.xml');
@@ -128,6 +131,9 @@ const onReady = async function onReady(
   let tvdFormatterPath = config.get('sqlclCodescan.tvdFormatterPath');
   let arboriPathLocal = config.get('sqlclCodescan.tvdArboriPath');
   if (tvdFormatterPath) {
+    if (!path.isAbsolute(tvdFormatterPath)) {
+      tvdFormatterPath = path.join(pWorkspacePath, tvdFormatterPath);
+    }
     const tvdFormatterExists = fs.existsSync(tvdFormatterPath);
     if (!tvdFormatterExists) {
       showWarning(`Tvd Formatter Path is set but "${tvdFormatterPath}" does not exist. Tvd Formatter Path will be ignored.`);
@@ -140,6 +146,9 @@ const onReady = async function onReady(
     }
   }
   if (arboriPathLocal) {
+    if (!path.isAbsolute(arboriPathLocal)) {
+      arboriPathLocal = path.join(pWorkspacePath, arboriPathLocal);
+    }
     const arboriPathExists = fs.existsSync(arboriPathLocal);
     if (!arboriPathExists) {
       showWarning(`Tvd Arbori Path is set but "${arboriPathLocal}" does not exist. Tvd Arbori Path will be ignored.`);

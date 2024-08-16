@@ -73,3 +73,9 @@ This extension contributes the following settings:
 ### 1.1.6
 * Improvements on auto scan on type
 * Added support for format on save
+
+### 1.1.7
+* Fixed parsing when using sqlcl 24.1+
+* Relative paths for formatting config files are properly parsed
+* Added filetype matching for oracle-sql file types
+* Fixed bug causing error when out of workspace files are linted
