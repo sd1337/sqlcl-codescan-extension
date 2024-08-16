@@ -40,7 +40,9 @@ const executeCommand = async function executeCommand(commandString: string): Pro
 };
 
 const documentCallback = async (document: vscode.TextDocument) => {
-  if (document.languageId !== 'plsql' && document.languageId !== 'sql' && document.languageId !== 'oraclesql' && document.languageId !== 'oracle_sql') { return; }
+  if (!['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'].includes(document.languageId)) {
+    return;
+  }
   const originalPath = document.uri.fsPath;
 
   let relativePath = document.uri.fsPath;
