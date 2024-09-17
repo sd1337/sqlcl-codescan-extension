@@ -79,3 +79,6 @@ This extension contributes the following settings:
 * Relative paths for formatting config files are properly parsed
 * Added filetype matching for oracle-sql file types
 * Fixed bug causing error when out of workspace files are linted
+
+### 1.1.8
+* Added formatting for oracle-sql file types
