@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import * as vscode from 'vscode';
-import { getCollection, parseCodeScanResultForFile } from './codescan';
+import { getCollection, parseCodeScanResultForFile, clearCollectionForDocument } from './codescan';
 import { copySqlFiles, emptyDirectory } from './fileUtils';
 import { onReady as formattingOnReady } from './formatting';
 
@@ -83,7 +83,7 @@ const documentCallback = async (document: vscode.TextDocument) => {
     const output = await executeCommand(`codescan ${joined}`) as string;
     outputChannel.append(output);
     if (fs.existsSync(path.join(globalTmpDir, scanResultName))) {
-      if (output.indexOf('0 total distinct warnings') === -1) {
+      if (output.indexOf(' 0 total distinct warnings') === -1) {
         try {
           const content = fs.readFileSync(path.resolve(path.join(globalTmpDir, scanResultName)), 'utf8');
           const warnings = JSON.parse(content);
@@ -119,6 +119,13 @@ if (config.get('sqlclCodescan.checkOnOpen')) {
 if (config.get('sqlclCodescan.checkOnSave')) {
   vscode.workspace.onDidSaveTextDocument(documentCallback);
 }
+
+vscode.workspace.onDidCloseTextDocument((document) => {
+  if (!['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'].includes(document.languageId)) {
+    return;
+  }
+  clearCollectionForDocument(document.uri);
+});
 
 if (config.get('sqlclCodescan.checkOnType')) {
   let timeoutId: NodeJS.Timeout;

@@ -273,3 +273,7 @@ export function parseCodeScanResultForFile(
   collection.delete(uri);
   collection.set(uri, mapped);
 }
+
+export function clearCollectionForDocument(uri: vscode.Uri) {
+  collection.delete(uri);
+}

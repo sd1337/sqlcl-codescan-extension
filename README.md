@@ -82,3 +82,6 @@ This extension contributes the following settings:
 
 ### 1.1.8
 * Added formatting for oracle-sql file types
+
+### 1.1.9
+* Closing diagnostics when files get closed
