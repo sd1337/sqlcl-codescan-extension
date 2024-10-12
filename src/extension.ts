@@ -41,14 +41,13 @@ const executeCommand = async function executeCommand(commandString: string): Pro
   });
 };
 
-const documentCallback = async (document: vscode.TextDocument) => {
+const copyFileToTemp = (document: vscode.TextDocument) => {
   const originalPath = document.uri.fsPath;
-
-  let relativePath = document.uri.fsPath;
+  let relativePath = originalPath;
   let targetDir;
   let outOfWorkspaceFile = false;
   if (relativePath.includes(workspacePath)) {
-    relativePath = document.uri.fsPath.replace(workspacePath, '');
+    relativePath = originalPath.replace(workspacePath, '');
     relativePath = relativePath.substring(1);
     targetDir = path.dirname(path.join(globalTmpDir, relativePath));
   } else {
@@ -63,22 +62,21 @@ const documentCallback = async (document: vscode.TextDocument) => {
 
   const text = document.getText();
   fs.writeFileSync(copyPath, text);
+  return { relativePath, outOfWorkspaceFile };
+};
+
+const scanTempDirectory = async (
+  outputMessage: string,
+  outOfWorkspaceFile: boolean,
+  singleFileUri: vscode.Uri = vscode.Uri.file(''),
+) => {
   if (proc) {
     const options = ['-path .', '-format json', `-output ${scanResultName}`];
-    // const settingsPath = config.get('sqlclCodescan.settingsPath');
-    // if (settingsPath) {
-    //   const absPath = path.join(workspacePath, settingsPath);
-    //   if (fs.existsSync(absPath)) {
-    //     options.push(`-settings "${absPath}"`);
-    //   } else {
-    //     console.warn(`settings file ${absPath} does not exist`);
-    //   }
-    // }
     const joined = options.join(' ');
     if (fs.existsSync(path.join(globalTmpDir, scanResultName))) {
       fs.unlinkSync(path.join(globalTmpDir, scanResultName));
     }
-    outputChannel.appendLine(`Scanning file ${relativePath}`);
+    outputChannel.appendLine(outputMessage);
     const output = await executeCommand(`codescan ${joined}`) as string;
     outputChannel.append(output);
     if (fs.existsSync(path.join(globalTmpDir, scanResultName))) {
@@ -92,7 +90,7 @@ const documentCallback = async (document: vscode.TextDocument) => {
             if (!outOfWorkspaceFile) {
               uri = vscode.Uri.file(path.join(workspacePath, fname));
             } else {
-              uri = vscode.Uri.file(relativePath);
+              uri = singleFileUri || vscode.Uri.file(p.file);
             }
             vscode.workspace.openTextDocument(uri).then((doc) => {
               parseCodeScanResultForFile(p, doc);
@@ -105,15 +103,21 @@ const documentCallback = async (document: vscode.TextDocument) => {
         }
       } else {
         const collection = getCollection();
-        collection.delete(document.uri);
+        collection.delete(singleFileUri);
       }
     }
   }
 };
 
+const documentCallback = async (document: vscode.TextDocument) => {
   if (!allowedFileTypes.includes(document.languageId)) {
     return;
   }
+  // const originalPath = document.uri.fsPath;
+  const { relativePath, outOfWorkspaceFile } = copyFileToTemp(document);
+  scanTempDirectory(`Scanning file ${relativePath}`, outOfWorkspaceFile, document.uri);
+};
+
 if (config.get('sqlclCodescan.checkOnOpen')) {
   vscode.workspace.onDidOpenTextDocument(documentCallback);
 }
@@ -241,6 +245,13 @@ const load = async function load(context: vscode.ExtensionContext) {
   let ready = false;
   const onReady = () => {
     writeInput('set define off\nset history off\n');
+    const openDocuments = vscode.workspace.textDocuments
+      .filter((p) => allowedFileTypes.includes(p.languageId));
+    openDocuments.forEach((doc) => {
+      copyFileToTemp(doc);
+    });
+    scanTempDirectory('Scanning workspace', false);
+
     if (formattingEnabled) {
       formattingOnReady(
         outputChannel,
