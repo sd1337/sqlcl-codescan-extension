@@ -14,6 +14,7 @@ let globalTmpDir: string;
 let proc: any;
 let workspacePath = '';
 const scanResultName = 'tmp.json';
+let command = 'sql';
 
 let config = vscode.workspace.getConfiguration();
 
@@ -139,29 +140,82 @@ if (config.get('sqlclCodescan.checkOnType')) {
   });
 }
 
-export function showWarning(message: string) {
-  outputChannel.appendLine(`WARNING: ${message}`);
-  vscode.window.showWarningMessage(message, 'Open Output Channel').then((selectedAction) => {
-    if (selectedAction && selectedAction === 'Open Output Channel') {
-      outputChannel.show();
-    }
-  });
+export function showWarning<T extends string>(
+  message: string,
+  ...items: T[]
+): Thenable<T | undefined> {
+  if (!items.length) {
+    outputChannel.appendLine(`WARNING: ${message}`);
+
+    vscode.window.showWarningMessage(message, 'Open Output Channel').then((selectedAction) => {
+      if (selectedAction && selectedAction === 'Open Output Channel') {
+        outputChannel.show();
+      }
+    });
+  } else {
+    return vscode.window.showWarningMessage(message, ...['Open Output Channel' as T, ...items]).then((selectedAction) => {
+      if (selectedAction && selectedAction === 'Open Output Channel') {
+        outputChannel.show();
+      }
+      return Promise.resolve(selectedAction);
+    });
+  }
+  return Promise.resolve(undefined);
 }
 
 const load = async function load(context: vscode.ExtensionContext) {
   if (vscode.workspace?.workspaceFolders?.length) {
     workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
   }
-  let command = 'sql';
   const configPath = config.get('sqlclCodescan.sqlClPath');
   if (configPath) {
     command = configPath as string;
   }
   outputChannel.appendLine(`Using sqlcl command: ${command}`);
   const foundRightVersion = await new Promise((resolve) => {
-    exec(`${command} -V`, (error, stdout) => {
+    exec(`${command} -V`, async (error, stdout) => {
       if (error) {
-        vscode.window.showErrorMessage(`SQLcl Codescan: ${error.message}`);
+        if (error.message.includes('not found') || error.message.includes('No such file or directory')) {
+          const sqlclPath = await config.get('sqlclCodescan.sqlClPath');
+          vscode.window.showErrorMessage('SQLcl Codescan: sqlcl command not found, '
+            + 'make sure it is in your PATH or set the correct path in the settings', 'Open Settings', 'Choose sqlcl file', 'Download').then((selectedAction) => {
+            if (selectedAction) {
+              switch (selectedAction) {
+                case 'Open Settings':
+                  vscode.commands.executeCommand('workbench.action.openSettings', 'sqlclCodescan.sqlClPath');
+                  break;
+                case 'Choose sqlcl file':
+                  // Open a file dialog to let the user select a file
+                  vscode.window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectFolders: false,
+                    canSelectMany: false,
+                    openLabel: 'Select sqlcl executable',
+                    defaultUri: sqlclPath ? vscode.Uri.file(path.dirname(sqlclPath)) : undefined,
+                    filters: {
+                      'All files': ['*'],
+                    },
+                  }).then((fileUri) => {
+                    if (fileUri && fileUri[0]) {
+                      config.update('sqlclCodescan.sqlClPath', fileUri[0].path, vscode.ConfigurationTarget.Global);
+                    }
+                  });
+                  break;
+                case 'Download':
+                  vscode.env.openExternal(vscode.Uri.parse('https://www.oracle.com/database/sqldeveloper/technologies/sqlcl/'));
+                  break;
+                default:
+                  break;
+              }
+            }
+          });
+        } else {
+          vscode.window.showErrorMessage(`SQLcl Codescan: ${error.message}`, 'Open Settings').then((selectedAction) => {
+            if (selectedAction) {
+              vscode.commands.executeCommand('workbench.action.openSettings', 'sqlclCodescan.sqlClPath');
+            }
+          });
+        }
         resolve(false);
         return;
       }
@@ -186,6 +240,7 @@ const load = async function load(context: vscode.ExtensionContext) {
 
   let ready = false;
   const onReady = () => {
+    writeInput('set define off\nset history off\n');
     if (formattingEnabled) {
       formattingOnReady(
         outputChannel,
@@ -209,13 +264,13 @@ const load = async function load(context: vscode.ExtensionContext) {
     if (!ready) {
       return;
     }
-    buffer += data.toString().replaceAll('SQL> ', '');
-    const matched = buffer.toString().match(/(.+)\n\$\$(.+)\n$/m);
+    buffer += str.replaceAll('SQL> ', '');
+    const matched = buffer.toString().match(/(.+)\n?\$\$(.+)\n$/m);
     if (matched) {
       const [, , dataStr] = matched;
       const cb = callbacks[dataStr];
       if (cb) {
-        cb(buffer.replace(/.+\n$/, ''));
+        cb(buffer.replace(new RegExp(`\\$\\$${dataStr}\n$`), ''));
         delete callbacks[dataStr];
         buffer = '';
       }
@@ -287,8 +342,12 @@ export function activate(context: vscode.ExtensionContext) {
         if (d !== disposable && d !== scanWorkspace && d !== unloadCommand) {
           d.dispose();
         }
-        // debugger;
       });
+      const sqlclPath = config.get('sqlclCodescan.sqlClPath');
+      if (sqlclPath !== command) {
+        command = sqlclPath as string;
+        load(context);
+      }
       outputChannel.appendLine('Configuration changed');
       const formattingEnabled = config.get('sqlclCodescan.enableFormatting');
       if (formattingEnabled) {

@@ -3,6 +3,11 @@ import { getCollection } from './codescan';
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+
+type ShowWarning = <T extends string>(message: string,
+  ...items: T[]
+) => Thenable<T | undefined>;
 
 let useTvdFormat = false;
 let useArbori = false;
@@ -12,7 +17,7 @@ let globalTmpDir = '';
 let workspacePath = '';
 let executeCommand: (command: string) => Promise<string>;
 let outputChannel: vscode.OutputChannel;
-let showWarning: (message: string) => void;
+let showWarning: ShowWarning;
 
 const formatText = async function formatText(
   document: vscode.TextDocument,
@@ -40,18 +45,22 @@ const formatText = async function formatText(
       fs.writeFileSync(inPath, text);
       // copyFileSync(fsPath, inPath);
       let result: string = '';
-      if (!useArbori) {
-        result = await executeCommand(`tvdformat ${inPath}`);
-      } else {
-        result = await executeCommand(`tvdformat ${inPath} "arbori=${arboriPath}"`);
+      const args = ['tvdformat', `"${inPath}"`];
+      if (useArbori) {
+        args.push(`"arbori=${arboriPath}"`);
       }
+      if (formatRulePath) {
+        args.push(`"xml=${formatRulePath}"`);
+      }
+      result = await executeCommand(args.join(' '));
       if (result.indexOf('... done.') === -1) {
         const sanitized = result.replace(inPath, relativePath).replaceAll('\n\n', '\n');
-        const matchedError = sanitized.match(/Syntax Error at line (\d+), column (\d+)\n\n([\s\S]+)\sskipped/m);
+        const matchedError = sanitized.match(/Syntax Error at line (\d+), column (\d+)\n\n([\s\S]+)\s... skipped/m);
         if (matchedError) {
           const [line, col, err] = matchedError.slice(1);
-          let lineNum = parseInt(line, 10);
+          let lineNum = parseInt(line, 10) - 2;
           let colNum = parseInt(col, 10);
+          const errMessage = err.replace(/^\s+/m, '');
           if (range) {
             lineNum += range.start.line;
             colNum += range.start.character;
@@ -66,7 +75,7 @@ const formatText = async function formatText(
               Math.max(1 + colNum, (foundLocal ? foundLocal.end.character : colNum)),
             ),
           );
-          const diag = new vscode.Diagnostic(newRange, err, vscode.DiagnosticSeverity.Error);
+          const diag = new vscode.Diagnostic(newRange, errMessage, vscode.DiagnosticSeverity.Error);
           const diagContext = getCollection();
           const getCurrent = diagContext.get(document.uri);
           const newCollection = [...getCurrent as [], diag];
@@ -115,8 +124,9 @@ const onReady = async function onReady(
   pWorkspacePath: string,
   pGlobalTmpDir: string,
   pExecuteCommand: (command: string) => Promise<string>,
-  pShowWarning: (message: string) => void,
+  pShowWarning: ShowWarning,
   context: vscode.ExtensionContext,
+  allowedFileTypes: string[],
 ) {
   outputChannel = pOutputChannel;
   workspacePath = pWorkspacePath;
@@ -179,7 +189,38 @@ const onReady = async function onReady(
     } else {
       customRules = tvdFormatterPath;
     }
-    executeCommand(`script "${customRules}" --register`);
+    const result = await executeCommand(`script "${customRules}" --register`);
+    if (result.indexOf('tvdformat registered as SQLcl command.') === -1) {
+      if (result.indexOf('!ScriptCommand') !== -1) {
+        showWarning('Failed to register tvdformat as SQLcl command. Make sure you are using a JDK with Nashorn support.', 'Select Java Home')
+          .then((selected) => {
+            if (selected === 'Select Java Home') {
+              vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: 'Select Java Home',
+              }).then((uri) => {
+                if (uri && uri[0]) {
+                  const javaHome = uri[0].fsPath;
+                  let sqlClPath: string | undefined = config.get('sqlclCodescan.sqlClPath');
+
+                  if (sqlClPath && sqlClPath.match(/JAVA_HOME/)) {
+                    sqlClPath = sqlClPath.replace(/JAVA_HOME="[^"]+"\s+/, '')
+                      .replace(/JAVA_HOME=\S+\s+/, '');
+                  }
+                  if (!sqlClPath) {
+                    sqlClPath = 'sql';
+                  }
+                  config.update('sqlclCodescan.sqlClPath', `JAVA_HOME=${javaHome} ${sqlClPath}`, vscode.ConfigurationTarget.Global);
+                }
+              });
+            }
+          });
+      } else {
+        showWarning('Failed to register tvdformat as SQLcl command. Please make sure the path to the tvd formatter is correct.');
+      }
+    }
     if (arboriPathLocal) {
       pOutputChannel.appendLine(`Using arbori advanced formatting script from ${arboriPathLocal}`);
       useArbori = true;
