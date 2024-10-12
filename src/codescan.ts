@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
 
-const path = require('path');
-
 const config = vscode.workspace.getConfiguration();
 
 const collection = vscode.languages.createDiagnosticCollection('codescanWarnings');
@@ -153,12 +151,10 @@ export function getSeverity(ruleNo: string): vscode.DiagnosticSeverity {
 }
 
 export function parseCodeScanResultForFile(
-  cwd: string,
-  fname: string,
   file: any,
   document: vscode.TextDocument,
 ) {
-  const uri = vscode.Uri.file(path.join(cwd, fname));
+  const { uri } = document;
   const mapped = file.issues.map((p: any) => {
     const { col, line } = p;
     const foundLocal = document.getWordRangeAtPosition(new vscode.Position(line, col + 1));

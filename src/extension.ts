@@ -95,9 +95,8 @@ const documentCallback = async (document: vscode.TextDocument) => {
             } else {
               uri = vscode.Uri.file(relativePath);
             }
-            const cwdPath = !outOfWorkspaceFile ? workspacePath : path.dirname(originalPath);
             vscode.workspace.openTextDocument(uri).then((doc) => {
-              parseCodeScanResultForFile(cwdPath, fname, p, doc);
+              parseCodeScanResultForFile(p, doc);
             });
           });
         } catch (e) {
