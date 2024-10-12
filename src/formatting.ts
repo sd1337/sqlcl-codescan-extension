@@ -7,6 +7,7 @@ const fs = require('fs');
 let useTvdFormat = false;
 let useArbori = false;
 let arboriPath = '';
+let formatRulePath: string | undefined = '';
 let globalTmpDir = '';
 let workspacePath = '';
 let executeCommand: (command: string) => Promise<string>;
@@ -100,6 +101,14 @@ const formatText = async function formatText(
   }
 };
 
+function resolveHome(filepath: string): string {
+  if (filepath[0] === '~') {
+    const homeDir = os.homedir();
+    return path.join(homeDir, filepath.slice(1));
+  }
+  return filepath;
+}
+
 const onReady = async function onReady(
   pOutputChannel: vscode.OutputChannel,
   config: vscode.WorkspaceConfiguration,
@@ -116,8 +125,9 @@ const onReady = async function onReady(
   showWarning = pShowWarning;
 
   pOutputChannel.appendLine('Formatting enabled');
-  let formatRulePath = config.get('sqlclCodescan.formattingRulePath');
+  formatRulePath = config.get('sqlclCodescan.formattingRulePath');
   if (formatRulePath) {
+    formatRulePath = resolveHome(formatRulePath);
     if (!path.isAbsolute(formatRulePath)) {
       formatRulePath = path.join(pWorkspacePath, formatRulePath);
     }
@@ -128,9 +138,10 @@ const onReady = async function onReady(
     executeCommand(`format RULES ${formatRulePath};`);
     pOutputChannel.appendLine(`Using formatting rules from ${formatRulePath}`);
   }
-  let tvdFormatterPath = config.get('sqlclCodescan.tvdFormatterPath');
-  let arboriPathLocal = config.get('sqlclCodescan.tvdArboriPath');
+  let tvdFormatterPath: string | undefined = config.get('sqlclCodescan.tvdFormatterPath');
+  let arboriPathLocal: string | undefined = config.get('sqlclCodescan.tvdArboriPath');
   if (tvdFormatterPath) {
+    tvdFormatterPath = resolveHome(tvdFormatterPath);
     if (!path.isAbsolute(tvdFormatterPath)) {
       tvdFormatterPath = path.join(pWorkspacePath, tvdFormatterPath);
     }
@@ -146,6 +157,7 @@ const onReady = async function onReady(
     }
   }
   if (arboriPathLocal) {
+    arboriPathLocal = resolveHome(arboriPathLocal);
     if (!path.isAbsolute(arboriPathLocal)) {
       arboriPathLocal = path.join(pWorkspacePath, arboriPathLocal);
     }
