@@ -9,6 +9,7 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 
+const allowedFileTypes = ['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'];
 let globalTmpDir: string;
 let proc: any;
 let workspacePath = '';
@@ -40,9 +41,6 @@ const executeCommand = async function executeCommand(commandString: string): Pro
 };
 
 const documentCallback = async (document: vscode.TextDocument) => {
-  if (!['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'].includes(document.languageId)) {
-    return;
-  }
   const originalPath = document.uri.fsPath;
 
   let relativePath = document.uri.fsPath;
@@ -112,6 +110,9 @@ const documentCallback = async (document: vscode.TextDocument) => {
   }
 };
 
+  if (!allowedFileTypes.includes(document.languageId)) {
+    return;
+  }
 if (config.get('sqlclCodescan.checkOnOpen')) {
   vscode.workspace.onDidOpenTextDocument(documentCallback);
 }
@@ -120,7 +121,7 @@ if (config.get('sqlclCodescan.checkOnSave')) {
 }
 
 vscode.workspace.onDidCloseTextDocument((document) => {
-  if (!['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'].includes(document.languageId)) {
+  if (!allowedFileTypes.includes(document.languageId)) {
     return;
   }
   clearCollectionForDocument(document.uri);
@@ -194,6 +195,7 @@ const load = async function load(context: vscode.ExtensionContext) {
         executeCommand,
         showWarning,
         context,
+        allowedFileTypes,
       );
     }
   };
@@ -298,6 +300,7 @@ export function activate(context: vscode.ExtensionContext) {
           executeCommand,
           showWarning,
           context,
+          allowedFileTypes,
         );
       }
     }

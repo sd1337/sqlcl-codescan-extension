@@ -191,13 +191,15 @@ const onReady = async function onReady(
     }
   }
 
-  const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'], {
-    provideDocumentFormattingEdits: (document: vscode.TextDocument) => formatText(document),
-  });
-  const rangeFormattingProvider = vscode.languages.registerDocumentRangeFormattingEditProvider(['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'], {
-    provideDocumentRangeFormattingEdits:
-    (document: vscode.TextDocument, range: vscode.Range) => formatText(document, range),
-  });
+  const formattingProvider = vscode.languages
+    .registerDocumentFormattingEditProvider(allowedFileTypes, {
+      provideDocumentFormattingEdits: (document: vscode.TextDocument) => formatText(document),
+    });
+  const rangeFormattingProvider = vscode.languages
+    .registerDocumentRangeFormattingEditProvider(allowedFileTypes, {
+      provideDocumentRangeFormattingEdits:
+      (document: vscode.TextDocument, range: vscode.Range) => formatText(document, range),
+    });
   context.subscriptions.push(formattingProvider, rangeFormattingProvider);
 };
 
