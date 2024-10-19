@@ -25,6 +25,7 @@ const formatText = async function formatText(
 ): Promise<vscode.TextEdit[]> {
   const { fsPath } = document.uri;
   try {
+    const lineEnding = document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
     const rndName = Math.random().toString(36).substring(7);
     const tmpPath = path.join(globalTmpDir, 'tvd_tmp');
     if (!fs.existsSync(tmpPath)) {
@@ -34,6 +35,7 @@ const formatText = async function formatText(
     const outPath = path.join(tmpPath, `${rndName}.sql`);
     const relativePath = fsPath.replace(workspacePath, '').substring(1);
     let formatSuccess = false;
+    let whiteSpaces = '';
     if (!useTvdFormat) {
       outputChannel.appendLine(`Formatting file ${relativePath} using default formatter`);
       await executeCommand(`format file ${fsPath} ${outPath};`);
@@ -43,7 +45,10 @@ const formatText = async function formatText(
       const inPath = path.join(tmpPath, `in_${rndName}.sql`);
       const text = document.getText(range);
       fs.writeFileSync(inPath, text);
-      // copyFileSync(fsPath, inPath);
+      if (range) {
+        const line = document.lineAt(range.start.line);
+        whiteSpaces = line.text.match(/^\s*/)?.[0] || '';
+      }
       let result: string = '';
       const args = ['tvdformat', `"${inPath}"`];
       if (useArbori) {
@@ -66,7 +71,7 @@ const formatText = async function formatText(
             colNum += range.start.character;
           }
           const foundLocal = document.getWordRangeAtPosition(
-            new vscode.Position(lineNum, colNum + 1),
+            new vscode.Position(lineNum, colNum),
           );
           const newRange = new vscode.Range(
             new vscode.Position(lineNum, colNum),
@@ -96,7 +101,11 @@ const formatText = async function formatText(
       outputChannel.appendLine(`Formatted file ${relativePath}`);
     }
     fs.unlinkSync(outPath);
-    // debugger;
+    // if (range) {
+    //   // replace trailing new line
+    //   formatted = whiteSpaces + formatted.replace(/\n$/, '');
+
+    // }
     return [{
       range: range || new vscode.Range(
         new vscode.Position(0, 0),

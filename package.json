@@ -94,7 +94,14 @@
           "default": ""
         }
       }
-    }
+    },
+    "codeActions": [
+            {
+                "languages": ["oraclesql", "oracle_sql", "oracle-sql"],
+                "kinds": ["quickfix"],
+                "title": "Ignore rule"
+            }
+        ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { getCollection, parseCodeScanResultForFile, clearCollectionForDocument } from './codescan';
 import { copySqlFiles, emptyDirectory } from './fileUtils';
 import { onReady as formattingOnReady } from './formatting';
+import { ignoreDiagnostic, ignoreDiagnosticForFile, ignoreDiagnosticForProject, MyCodeActionProvider, showDocumentation } from './codeActions';
 
 const fs = require('fs');
 const path = require('path');
@@ -341,6 +342,17 @@ export function activate(context: vscode.ExtensionContext) {
       executeCommand(`codescan ${joined}`);
     }
   });
+
+  const codeActionProvider = new MyCodeActionProvider();
+  context.subscriptions.push(vscode.languages.registerCodeActionsProvider(
+    ['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'],
+    codeActionProvider,
+  ));
+
+  vscode.commands.registerCommand('sqlclCodescan.ignoreSingle', ignoreDiagnostic);
+  vscode.commands.registerCommand('sqlclCodescan.ignoreFile', ignoreDiagnosticForFile);
+  vscode.commands.registerCommand('sqlclCodescan.ignoreProject', ignoreDiagnosticForProject);
+  vscode.commands.registerCommand('sqlclCodescan.openDocumentation', showDocumentation);
 
   context.subscriptions.push(disposable);
   context.subscriptions.push(scanWorkspace);
