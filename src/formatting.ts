@@ -94,7 +94,7 @@ const formatText = async function formatText(
       fs.copyFileSync(inPath, outPath);
       fs.unlinkSync(inPath);
     }
-    const formatted = fs.readFileSync(outPath, 'utf8');
+    let formatted = fs.readFileSync(outPath, 'utf8');
     if (!formatSuccess) {
       outputChannel.appendLine(`An error occured while formatting ${fsPath}`);
     } else {

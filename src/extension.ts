@@ -3,7 +3,14 @@ import * as vscode from 'vscode';
 import { getCollection, parseCodeScanResultForFile, clearCollectionForDocument } from './codescan';
 import { copySqlFiles, emptyDirectory } from './fileUtils';
 import { onReady as formattingOnReady } from './formatting';
-import { ignoreDiagnostic, ignoreDiagnosticForFile, ignoreDiagnosticForProject, MyCodeActionProvider, showDocumentation } from './codeActions';
+import {
+  ignoreDiagnostic,
+  ignoreDiagnosticForFile,
+  ignoreDiagnosticForProject,
+  MyCodeActionProvider,
+  showDocumentation,
+} from './codeActions';
+
 
 const fs = require('fs');
 const path = require('path');
@@ -18,6 +25,8 @@ const scanResultName = 'tmp.json';
 let command = 'sql';
 
 let config = vscode.workspace.getConfiguration();
+
+let globalIgnoredRules: string[] = [];
 
 const outputChannel = vscode.window.createOutputChannel('sqlcl codescan');
 outputChannel.show(true);
@@ -94,7 +103,7 @@ const scanTempDirectory = async (
               uri = singleFileUri || vscode.Uri.file(p.file);
             }
             vscode.workspace.openTextDocument(uri).then((doc) => {
-              parseCodeScanResultForFile(p, doc);
+              parseCodeScanResultForFile(p, doc, globalIgnoredRules);
             });
           });
         } catch (e) {
@@ -168,10 +177,17 @@ export function showWarning<T extends string>(
   return Promise.resolve(undefined);
 }
 
+const updateIgnoredRules = function updateIgnoredRules() {
+  if (fs.existsSync(path.join(workspacePath, '.codescanignore'))) {
+    globalIgnoredRules = fs.readFileSync(path.join(workspacePath, '.codescanignore'), 'utf8').replace(/\r\n/g, '\n').split('\n').filter((p: string) => p);
+  }
+};
+
 const load = async function load(context: vscode.ExtensionContext) {
   if (vscode.workspace?.workspaceFolders?.length) {
     workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
   }
+  updateIgnoredRules();
   const configPath = config.get('sqlclCodescan.sqlClPath');
   if (configPath) {
     command = configPath as string;
@@ -351,7 +367,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.registerCommand('sqlclCodescan.ignoreSingle', ignoreDiagnostic);
   vscode.commands.registerCommand('sqlclCodescan.ignoreFile', ignoreDiagnosticForFile);
-  vscode.commands.registerCommand('sqlclCodescan.ignoreProject', ignoreDiagnosticForProject);
+  vscode.commands.registerCommand('sqlclCodescan.ignoreProject', (diagnostic: vscode.Diagnostic) => {
+    ignoreDiagnosticForProject(diagnostic);
+    updateIgnoredRules();
+  });
   vscode.commands.registerCommand('sqlclCodescan.openDocumentation', showDocumentation);
 
   context.subscriptions.push(disposable);

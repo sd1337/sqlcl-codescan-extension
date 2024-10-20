@@ -3,7 +3,7 @@
   "displayName": "sqlcl-codescan",
   "publisher": "NikoSperat",
   "description": "",
-  "version": "1.1.10",
+  "version": "1.2.0",
   "engines": {
     "vscode": "^1.83.0"
   },
@@ -96,12 +96,18 @@
       }
     },
     "codeActions": [
-            {
-                "languages": ["oraclesql", "oracle_sql", "oracle-sql"],
-                "kinds": ["quickfix"],
-                "title": "Ignore rule"
-            }
-        ]
+      {
+        "languages": [
+          "oraclesql",
+          "oracle_sql",
+          "oracle-sql"
+        ],
+        "kinds": [
+          "quickfix"
+        ],
+        "title": "Ignore rule"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

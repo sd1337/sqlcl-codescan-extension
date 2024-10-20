@@ -153,6 +153,7 @@ export function getSeverity(ruleNo: string): vscode.DiagnosticSeverity {
 export function parseCodeScanResultForFile(
   file: any,
   document: vscode.TextDocument,
+  globalIgnoredRules: string[],
 ) {
   const { uri } = document;
   const documentIgnoredRules = document.lineAt(0).text.match(/--\s*codescan-disable-next-line\s*(.*)/)
@@ -160,6 +161,9 @@ export function parseCodeScanResultForFile(
   let ignoredRules: {
     [key: string]: boolean;
   } = {};
+  globalIgnoredRules.forEach((rule) => {
+    ignoredRules[rule] = true;
+  });
   if (documentIgnoredRules) {
     ignoredRules = documentIgnoredRules[1].split(' ').reduce((acc: any, rule: string) => {
       acc[rule] = true;
