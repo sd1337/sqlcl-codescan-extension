@@ -26,6 +26,7 @@ This extension contributes the following settings:
 * `sqlclCodescan.tvdFormatterPath`: Path to format.js to load tvdformatter script
 * `sqlclCodescan.tvdArboriPath`: Path to tvd custom formatting arbori file
 * `sqlclCodescan.websiteInfo`: URL where details about the rules can be found
+* `sqlclCodescan.experimentalPatchCodeScan`: Patch the sqlcl jar so it does no longer filter for unique codescan values but displays all found issues
 
 ## Known Issues
 
@@ -85,3 +86,7 @@ This extension contributes the following settings:
 
 ### 1.1.9
 * Closing diagnostics when files get closed
+
+### 1.2.0
+* Added ability to ignore rules locally, on file level and globally
+* Added experimental feature to patch the sqlcl jar file removing the codescan unique filter

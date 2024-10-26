@@ -1,12 +1,16 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { getCollection } from './codescan';
+import {
+  COMMAND_IGNORE_FILE, COMMAND_IGNORE_PROJECT, COMMAND_IGNORE_SINGLE, COMMAND_OPEN_DOCUMENTATION,
+} from './constants';
 
 const collection = getCollection();
 
 type DiagnosticCode = { value: string; target: vscode.Uri };
 
-export class MyCodeActionProvider implements vscode.CodeActionProvider {
+export class SqlClCodeActionProvider implements vscode.CodeActionProvider {
+  // eslint-disable-next-line class-methods-use-this
   provideCodeActions(
     document: vscode.TextDocument,
     range: vscode.Range,
@@ -24,7 +28,7 @@ export class MyCodeActionProvider implements vscode.CodeActionProvider {
           title: `Disable Rule "${code.value}" for this line`,
           command: {
             title: `Disable Rule "${code.value}" for this line`,
-            command: 'sqlclCodescan.ignoreSingle',
+            command: COMMAND_IGNORE_SINGLE,
             arguments: [document, diagnostic],
           },
           diagnostics: [diagnostic],
@@ -35,7 +39,7 @@ export class MyCodeActionProvider implements vscode.CodeActionProvider {
           title: `Disable Rule "${code.value}" for this file`,
           command: {
             title: `Disable Rule "${code.value}" for this file`,
-            command: 'sqlclCodescan.ignoreFile',
+            command: COMMAND_IGNORE_FILE,
             arguments: [document, diagnostic],
           },
           diagnostics: [diagnostic],
@@ -45,7 +49,7 @@ export class MyCodeActionProvider implements vscode.CodeActionProvider {
           title: `Disable Rule "${code.value}" for this project`,
           command: {
             title: `Disable Rule "${code.value}" for this project`,
-            command: 'sqlclCodescan.ignoreProject',
+            command: COMMAND_IGNORE_PROJECT,
             arguments: [diagnostic],
           },
           diagnostics: [diagnostic],
@@ -55,7 +59,7 @@ export class MyCodeActionProvider implements vscode.CodeActionProvider {
           title: `Show documentation for "${code.value}"`,
           command: {
             title: `Show documentation for "${code.value}"`,
-            command: 'sqlclCodescan.openDocumentation',
+            command: COMMAND_OPEN_DOCUMENTATION,
             arguments: [code.target],
           },
         },

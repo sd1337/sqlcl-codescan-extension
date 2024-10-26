@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import { getCollection } from './codescan';
+import {
+  CONFIG_FORMATTING_RULE_PATH, CONFIG_SQLCL_PATH, CONFIG_TVD_ARBORI_PATH, CONFIG_TVD_FORMATTER_PATH,
+} from './constants';
 
 const path = require('path');
 const fs = require('fs');
@@ -94,7 +97,7 @@ const formatText = async function formatText(
       fs.copyFileSync(inPath, outPath);
       fs.unlinkSync(inPath);
     }
-    let formatted = fs.readFileSync(outPath, 'utf8');
+    const formatted = fs.readFileSync(outPath, 'utf8');
     if (!formatSuccess) {
       outputChannel.appendLine(`An error occured while formatting ${fsPath}`);
     } else {
@@ -144,7 +147,7 @@ const onReady = async function onReady(
   showWarning = pShowWarning;
 
   pOutputChannel.appendLine('Formatting enabled');
-  formatRulePath = config.get('sqlclCodescan.formattingRulePath');
+  formatRulePath = config.get(CONFIG_FORMATTING_RULE_PATH);
   if (formatRulePath) {
     formatRulePath = resolveHome(formatRulePath);
     if (!path.isAbsolute(formatRulePath)) {
@@ -157,8 +160,8 @@ const onReady = async function onReady(
     executeCommand(`format RULES ${formatRulePath};`);
     pOutputChannel.appendLine(`Using formatting rules from ${formatRulePath}`);
   }
-  let tvdFormatterPath: string | undefined = config.get('sqlclCodescan.tvdFormatterPath');
-  let arboriPathLocal: string | undefined = config.get('sqlclCodescan.tvdArboriPath');
+  let tvdFormatterPath: string | undefined = config.get(CONFIG_TVD_FORMATTER_PATH);
+  let arboriPathLocal: string | undefined = config.get(CONFIG_TVD_ARBORI_PATH);
   if (tvdFormatterPath) {
     tvdFormatterPath = resolveHome(tvdFormatterPath);
     if (!path.isAbsolute(tvdFormatterPath)) {
@@ -212,7 +215,7 @@ const onReady = async function onReady(
               }).then((uri) => {
                 if (uri && uri[0]) {
                   const javaHome = uri[0].fsPath;
-                  let sqlClPath: string | undefined = config.get('sqlclCodescan.sqlClPath');
+                  let sqlClPath: string | undefined = config.get(CONFIG_SQLCL_PATH);
 
                   if (sqlClPath && sqlClPath.match(/JAVA_HOME/)) {
                     sqlClPath = sqlClPath.replace(/JAVA_HOME="[^"]+"\s+/, '')
@@ -221,7 +224,7 @@ const onReady = async function onReady(
                   if (!sqlClPath) {
                     sqlClPath = 'sql';
                   }
-                  config.update('sqlclCodescan.sqlClPath', `JAVA_HOME=${javaHome} ${sqlClPath}`, vscode.ConfigurationTarget.Global);
+                  config.update(CONFIG_SQLCL_PATH, `JAVA_HOME=${javaHome} ${sqlClPath}`, vscode.ConfigurationTarget.Global);
                 }
               });
             }

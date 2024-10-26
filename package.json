@@ -17,7 +17,10 @@
     "onLanguage:oracle_sql",
     "onLanguage:oracle-sql"
   ],
-  "repository": "https://github.com/sd1337/sqlcl-codescan-extension",
+  "repository": {
+    "url": "https://github.com/sd1337/sqlcl-codescan-extension",
+    "type": "git"
+  },
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -92,6 +95,12 @@
           "scope": "window",
           "type": "string",
           "default": ""
+        },
+        "sqlclCodescan.experimentalPatchCodeScan": {
+          "description": "Enable experimental patching of sqlcl codescan class in jar to show all issues not only the first one",
+          "scope": "window",
+          "type": "boolean",
+          "default": false
         }
       }
     },
@@ -105,7 +114,19 @@
         "kinds": [
           "quickfix"
         ],
-        "title": "Ignore rule"
+        "actions": {
+          "title": "Ignore rule",
+          "kind": "quickfix",
+          "ignoreRule": {
+            "title": "Ignore rule",
+            "kind": "quickfix",
+            "command": "sqlclCodescan.ignoreSingle",
+            "arguments": [
+              "${file}",
+              "${diagnostic}"
+            ]
+          }
+        }
       }
     ]
   },
@@ -120,6 +141,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.2",
     "@types/node": "18.x",
+    "@types/unzipper": "^0.10.10",
     "@types/vscode": "^1.83.0",
     "@typescript-eslint/eslint-plugin": "^6.9.0",
     "@typescript-eslint/parser": "^6.9.0",
@@ -131,5 +153,8 @@
     "mocha": "^10.2.0",
     "path": "^0.12.7",
     "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "unzipper": "^0.12.3"
   }
 }

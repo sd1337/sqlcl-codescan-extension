@@ -7,10 +7,26 @@ import {
   ignoreDiagnostic,
   ignoreDiagnosticForFile,
   ignoreDiagnosticForProject,
-  MyCodeActionProvider,
+  SqlClCodeActionProvider,
   showDocumentation,
 } from './codeActions';
 
+import { patchDbToolsCommon } from './patchSqlcl';
+import {
+  COMMAND_DISABLE,
+  COMMAND_ENABLE,
+  COMMAND_IGNORE_FILE,
+  COMMAND_IGNORE_PROJECT,
+  COMMAND_IGNORE_SINGLE,
+  COMMAND_OPEN_DOCUMENTATION,
+  COMMAND_SCAN_WORKSPACE,
+  CONFIG_CHECK_ON_OPEN,
+  CONFIG_CHECK_ON_SAVE,
+  CONFIG_CHECK_ON_TYPE,
+  CONFIG_ENABLE_FORMATTING,
+  CONFIG_EXPERIMENTAL_PATCH_CODE_SCAN,
+  CONFIG_SQLCL_PATH,
+} from './constants';
 
 const fs = require('fs');
 const path = require('path');
@@ -128,10 +144,10 @@ const documentCallback = async (document: vscode.TextDocument) => {
   scanTempDirectory(`Scanning file ${relativePath}`, outOfWorkspaceFile, document.uri);
 };
 
-if (config.get('sqlclCodescan.checkOnOpen')) {
+if (config.get(CONFIG_CHECK_ON_OPEN)) {
   vscode.workspace.onDidOpenTextDocument(documentCallback);
 }
-if (config.get('sqlclCodescan.checkOnSave')) {
+if (config.get(CONFIG_CHECK_ON_SAVE)) {
   vscode.workspace.onDidSaveTextDocument(documentCallback);
 }
 
@@ -142,7 +158,7 @@ vscode.workspace.onDidCloseTextDocument((document) => {
   clearCollectionForDocument(document.uri);
 });
 
-if (config.get('sqlclCodescan.checkOnType')) {
+if (config.get(CONFIG_CHECK_ON_TYPE)) {
   let timeoutId: NodeJS.Timeout;
   vscode.workspace.onDidChangeTextDocument((event) => {
     // debounce here using setTimeout
@@ -188,22 +204,26 @@ const load = async function load(context: vscode.ExtensionContext) {
     workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
   }
   updateIgnoredRules();
-  const configPath = config.get('sqlclCodescan.sqlClPath');
+  const configPath = config.get(CONFIG_SQLCL_PATH);
   if (configPath) {
     command = configPath as string;
+  }
+  const experimentalPatchEnabled = config.get(CONFIG_EXPERIMENTAL_PATCH_CODE_SCAN);
+  if (experimentalPatchEnabled) {
+    await patchDbToolsCommon(context, configPath as string, outputChannel.appendLine);
   }
   outputChannel.appendLine(`Using sqlcl command: ${command}`);
   const foundRightVersion = await new Promise((resolve) => {
     exec(`${command} -V`, async (error, stdout) => {
       if (error) {
         if (error.message.includes('not found') || error.message.includes('No such file or directory')) {
-          const sqlclPath = await config.get('sqlclCodescan.sqlClPath');
+          const sqlclPath = await config.get(CONFIG_SQLCL_PATH);
           vscode.window.showErrorMessage('SQLcl Codescan: sqlcl command not found, '
             + 'make sure it is in your PATH or set the correct path in the settings', 'Open Settings', 'Choose sqlcl file', 'Download').then((selectedAction) => {
             if (selectedAction) {
               switch (selectedAction) {
                 case 'Open Settings':
-                  vscode.commands.executeCommand('workbench.action.openSettings', 'sqlclCodescan.sqlClPath');
+                  vscode.commands.executeCommand('workbench.action.openSettings', CONFIG_SQLCL_PATH);
                   break;
                 case 'Choose sqlcl file':
                   // Open a file dialog to let the user select a file
@@ -218,7 +238,11 @@ const load = async function load(context: vscode.ExtensionContext) {
                     },
                   }).then((fileUri) => {
                     if (fileUri && fileUri[0]) {
-                      config.update('sqlclCodescan.sqlClPath', fileUri[0].path, vscode.ConfigurationTarget.Global);
+                      config.update(
+                        CONFIG_SQLCL_PATH,
+                        fileUri[0].path,
+                        vscode.ConfigurationTarget.Global,
+                      );
                     }
                   });
                   break;
@@ -233,7 +257,7 @@ const load = async function load(context: vscode.ExtensionContext) {
         } else {
           vscode.window.showErrorMessage(`SQLcl Codescan: ${error.message}`, 'Open Settings').then((selectedAction) => {
             if (selectedAction) {
-              vscode.commands.executeCommand('workbench.action.openSettings', 'sqlclCodescan.sqlClPath');
+              vscode.commands.executeCommand('workbench.action.openSettings', CONFIG_SQLCL_PATH);
             }
           });
         }
@@ -255,7 +279,7 @@ const load = async function load(context: vscode.ExtensionContext) {
   if (!foundRightVersion) {
     return;
   }
-  const formattingEnabled = config.get('sqlclCodescan.enableFormatting');
+  const formattingEnabled = config.get(CONFIG_ENABLE_FORMATTING);
 
   proc = spawn(`${command} /nolog`, { cwd: globalTmpDir, shell: true });
 
@@ -335,43 +359,34 @@ export function activate(context: vscode.ExtensionContext) {
   }
   emptyDirectory(globalTmpDir);
   load(context);
-  const disposable = vscode.commands.registerCommand('sqlclCodescan.enable', () => {
+  const disposable = vscode.commands.registerCommand(COMMAND_ENABLE, () => {
     load(context);
   });
-  const unloadCommand = vscode.commands.registerCommand('sqlclCodescan.disable', () => {
+  const unloadCommand = vscode.commands.registerCommand(COMMAND_DISABLE, () => {
     unload();
   });
-  const scanWorkspace = vscode.commands.registerCommand('sqlclCodescan.scanWorkspace', () => {
+  const scanWorkspace = vscode.commands.registerCommand(COMMAND_SCAN_WORKSPACE, () => {
     if (proc) {
       copySqlFiles(workspacePath, globalTmpDir);
       const options = ['-path .', '-format json', `-output ${scanResultName}`];
-      //   const settingsPath = config.get('sqlclCodescan.settingsPath');
-      //   if (settingsPath) {
-      //     const absPath = path.join(workspacePath, settingsPath);
-      //     if (fs.existsSync(absPath)) {
-      //       options.push(`-settings "${absPath}"`);
-      //     } else {
-      //       console.warn(`settings file ${absPath} does not exist`);
-      //     }
-      //   }
       const joined = options.join(' ');
       executeCommand(`codescan ${joined}`);
     }
   });
 
-  const codeActionProvider = new MyCodeActionProvider();
+  const codeActionProvider = new SqlClCodeActionProvider();
   context.subscriptions.push(vscode.languages.registerCodeActionsProvider(
     ['plsql', 'sql', 'oraclesql', 'oracle_sql', 'oracle-sql'],
     codeActionProvider,
   ));
 
-  vscode.commands.registerCommand('sqlclCodescan.ignoreSingle', ignoreDiagnostic);
-  vscode.commands.registerCommand('sqlclCodescan.ignoreFile', ignoreDiagnosticForFile);
-  vscode.commands.registerCommand('sqlclCodescan.ignoreProject', (diagnostic: vscode.Diagnostic) => {
+  vscode.commands.registerCommand(COMMAND_IGNORE_SINGLE, ignoreDiagnostic);
+  vscode.commands.registerCommand(COMMAND_IGNORE_FILE, ignoreDiagnosticForFile);
+  vscode.commands.registerCommand(COMMAND_IGNORE_PROJECT, (diagnostic: vscode.Diagnostic) => {
     ignoreDiagnosticForProject(diagnostic);
     updateIgnoredRules();
   });
-  vscode.commands.registerCommand('sqlclCodescan.openDocumentation', showDocumentation);
+  vscode.commands.registerCommand(COMMAND_OPEN_DOCUMENTATION, showDocumentation);
 
   context.subscriptions.push(disposable);
   context.subscriptions.push(scanWorkspace);
@@ -385,13 +400,13 @@ export function activate(context: vscode.ExtensionContext) {
           d.dispose();
         }
       });
-      const sqlclPath = config.get('sqlclCodescan.sqlClPath');
+      const sqlclPath = config.get(CONFIG_SQLCL_PATH);
       if (sqlclPath !== command) {
         command = sqlclPath as string;
         load(context);
       }
       outputChannel.appendLine('Configuration changed');
-      const formattingEnabled = config.get('sqlclCodescan.enableFormatting');
+      const formattingEnabled = config.get(CONFIG_ENABLE_FORMATTING);
       if (formattingEnabled) {
         formattingOnReady(
           outputChannel,

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { CONFIG_WEBSITE_INFO } from './constants';
 
 const config = vscode.workspace.getConfiguration();
 
@@ -288,7 +289,7 @@ export function parseCodeScanResultForFile(
       }
       diag.code = {
         value: p.ruleNo,
-        target: vscode.Uri.parse(`${config.get('sqlclCodescan.websiteInfo')}${intermediateUrl}/${p.ruleNo.toLowerCase()}/`),
+        target: vscode.Uri.parse(`${config.get(CONFIG_WEBSITE_INFO)}${intermediateUrl}/${p.ruleNo.toLowerCase()}/`),
       };
       return diag;
     });
